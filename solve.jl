@@ -100,11 +100,3 @@ function name_to_bounds(registry_path::String)::BoundsDict
 
     return nameToBounds
 end
-
-function compatible_versions(versions::VersionsDict, bounds::BoundsDict, name::String)
-
-end
-
-function solve(name::String)
-
-end
