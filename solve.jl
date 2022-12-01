@@ -17,7 +17,7 @@ function name_to_version_info(registry_path::String)
 
     nameToVersionInfo = Dict()
     for (name, path) in nameToPath
-        nameToVersionInfo[name] = sort(map(VersionNumber, collect(keys(parsefile(joinpath(registry_path, path, "Versions.toml"))))))
+        nameToVersionInfo[name] = joinpath(registry_path, path, "Versions.toml") |> parsefile |> keys |> collect |> (x -> map(VersionNumber, x)) |> sort
     end
     return nameToVersionInfo
 end
