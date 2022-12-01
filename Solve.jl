@@ -1,8 +1,13 @@
 
-include("./util.jl")
-
 using Z3
 using Z3: ExprAllocated
+
+
+function show_version_number(vn::VersionNumber)::String
+    io = IOBuffer()
+    print(io, vn)
+    return String(take!(io))
+end
 
 function run_solver(bounds, versions, latest_versions)
     ctx = Context()
