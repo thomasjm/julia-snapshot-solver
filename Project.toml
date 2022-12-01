@@ -1,0 +1,7 @@
+[deps]
+Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+PicoSAT = "ff2beb65-d7cd-5ff1-a187-74671133a339"
+Pipe = "b98c9c47-44ae-5843-9183-064241ee97a0"
+PkgDeps = "839e9fc8-855b-5b3c-a3b7-2833d3dd1f59"
+Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+Z3 = "06b161dc-0161-11ea-0f74-41f836f4024b"
