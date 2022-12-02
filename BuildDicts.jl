@@ -17,7 +17,7 @@ function name_to_path(registry_path::String)::Dict{String, String}
 end
 
 const VersionsDict = Dict{String, Vector{VersionNumber}}
-function name_to_versions(registry_path::String)::VersionsDict
+function build_name_to_versions(registry_path::String)::VersionsDict
     nameToPath = name_to_path(registry_path)
 
     nameToVersionInfo = Dict()
@@ -25,16 +25,6 @@ function name_to_versions(registry_path::String)::VersionsDict
         nameToVersionInfo[name] = joinpath(registry_path, path, "Versions.toml") |> parsefile |> keys |> collect |> (x -> map(VersionNumber, x)) |> sort
     end
     return nameToVersionInfo
-end
-
-function name_to_latest_version(registry_path::String)::Dict{String, VersionNumber}
-    nameToVersionInfo = name_to_versions(registry_path)
-
-    ret = Dict()
-    for (name, versions) in nameToVersionInfo
-        ret[name] = first(findmax(versions))
-    end
-    return ret
 end
 
 const Constraints = Vector{Any}
@@ -46,7 +36,7 @@ const BoundsDict = Dict{NameAndVersion, Dict{String, Constraints}}
 function name_to_bounds(registry_path::String)::BoundsDict
     nameToPath = name_to_path(registry_path)
 
-    nameToVersions = name_to_versions(registry_path)
+    nameToVersions = build_name_to_versions(registry_path)
 
     nameToBounds = Dict()
     for (name, path) in nameToPath

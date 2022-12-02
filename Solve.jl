@@ -22,7 +22,7 @@ function add_nway_resolvability_constraints(versions::VersionsDict, nv_to_const,
     for subset in subsets_iterator
         # Find the deps shared by all subsets
         shared_deps = reduce(intersect, map(nv -> keys(bounds[nv]), subset))
-        if length(shared_deps) == 0 || shared_deps == Set(["julia"])
+        if length(shared_deps) == 0
             continue
         end
 
@@ -35,10 +35,9 @@ function add_nway_resolvability_constraints(versions::VersionsDict, nv_to_const,
         constraints_to_add = []
         resolution_failure = false
         for (dep_name, specs) in relevant_bounds
-            if dep_name == "julia"; continue; end
             if !haskey(versions, dep_name); continue; end
 
-            compatible_versions = filter(v -> all(spec -> in(v, spec), specs), versions[dep_name])
+            compatible_versions = filter(v -> all([v in spec for spec in specs]), versions[dep_name])
             if length(compatible_versions) == 0
                 # Guess this subset isn't resolvable at all
                 # @warn "$subset: Couldn't find a compatible version for $dep_name with specs $specs (available: $(versions[dep_name]))"
@@ -66,7 +65,6 @@ end
 function has_more_than_n_nontrivial_constraints(nv, bs::Dict{String, Constraints}, n)::Bool
     num_nontrivial = 0
     for (dep_name, constraints) in bs
-        if dep_name == "julia"; continue; end
         if length(constraints) > 0
             num_nontrivial += 1
         end
@@ -94,11 +92,11 @@ function run_solver(bounds::BoundsDict, versions::VersionsDict, latest_versions:
     latest_versions_with_nontrivial_bounds = filter(nv -> has_more_than_n_nontrivial_constraints(nv, bounds[nv], 0), latest_versions)
 
     # Every package we just added must be 1-resolvable
-    @info "Adding 1-way resolvability constraints ($(binomial(length(latest_versions), 1)))"
+    @info "Adding 1-way resolvability constraints ($(binomial(length(latest_versions), 1)) packages)"
     added = add_nway_resolvability_constraints(versions, nv_to_const, s, latest_versions, 1)
     @info "Added $added constraints"
 
-    @info "Adding 2-way resolvability constraints (max possible $(binomial(length(latest_versions_with_nontrivial_bounds), 2)))"
+    @info "Adding 2-way resolvability constraints (max possible $(binomial(length(latest_versions_with_nontrivial_bounds), 2)) package subsets)"
     added = add_nway_resolvability_constraints(versions, nv_to_const, s, latest_versions, 2)
     @info "Added $added constraints"
 
