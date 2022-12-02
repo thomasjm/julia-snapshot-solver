@@ -44,7 +44,10 @@ function add_nway_resolvability_constraints(versions::VersionsDict, nv_to_const,
                 resolution_failure = true
                 break
             else
-                push!(constraints_to_add, reduce(or, [nv_to_const[NameAndVersion(dep_name, v)] for v in compatible_versions]))
+                push!(constraints_to_add, implies(
+                    reduce(and, [nv_to_const[nv] for nv in subset]),
+                    reduce(or, [nv_to_const[NameAndVersion(dep_name, v)] for v in compatible_versions])
+                ))
             end
         end
 
