@@ -11,13 +11,21 @@ function show_version_number(vn::VersionNumber)::String
     return String(take!(io))
 end
 
-function add_nway_resolvability_constraints(versions::VersionsDict, nv_to_const, s::OptimizeAllocated, nvs::Vector{NameAndVersion}, n::Int64)
+function add_nway_resolvability_constraints(versions::VersionsDict, nv_to_const, s::OptimizeAllocated, nvs::Vector{NameAndVersion}, n::Int64)::Int64
     subsets_iterator = combinations(nvs, n)
+
+    num_added = 0
 
     p = Progress(binomial(length(nvs), n), 1)
     counter = 0
 
     for subset in subsets_iterator
+        # Find the deps shared by all subsets
+        shared_deps = reduce(intersect, map(nv -> keys(bounds[nv]), subset))
+        if length(shared_deps) == 0 || shared_deps == Set(["julia"])
+            continue
+        end
+
         # Build up the full set of bounds
         relevant_bounds = Dict{String, Constraints}()
         for nv in subset
@@ -44,12 +52,27 @@ function add_nway_resolvability_constraints(versions::VersionsDict, nv_to_const,
         if !resolution_failure
             for c in constraints_to_add
                 add(s, c)
+                num_added += 1
             end
         end
 
         counter += 1
         update!(p, counter)
     end
+
+    return num_added
+end
+
+function has_more_than_n_nontrivial_constraints(nv, bs::Dict{String, Constraints}, n)::Bool
+    num_nontrivial = 0
+    for (dep_name, constraints) in bs
+        if dep_name == "julia"; continue; end
+        if length(constraints) > 0
+            num_nontrivial += 1
+        end
+    end
+
+    return num_nontrivial > n
 end
 
 function run_solver(bounds::BoundsDict, versions::VersionsDict, latest_versions::Vector{NameAndVersion})
@@ -67,12 +90,17 @@ function run_solver(bounds::BoundsDict, versions::VersionsDict, latest_versions:
         add(s, nv_to_const[nv] == true)
     end
 
+    # Packages with more than 1 dependency?
+    latest_versions_with_nontrivial_bounds = filter(nv -> has_more_than_n_nontrivial_constraints(nv, bounds[nv], 0), latest_versions)
+
     # Every package we just added must be 1-resolvable
     @info "Adding 1-way resolvability constraints ($(binomial(length(latest_versions), 1)))"
-    add_nway_resolvability_constraints(versions, nv_to_const, s, latest_versions, 1)
+    added = add_nway_resolvability_constraints(versions, nv_to_const, s, latest_versions, 1)
+    @info "Added $added constraints"
 
-    @info "Adding 2-way resolvability constraints ($(binomial(length(latest_versions), 2)))"
-    add_nway_resolvability_constraints(versions, nv_to_const, s, latest_versions, 2)
+    @info "Adding 2-way resolvability constraints (max possible $(binomial(length(latest_versions_with_nontrivial_bounds), 2)))"
+    added = add_nway_resolvability_constraints(versions, nv_to_const, s, latest_versions, 2)
+    @info "Added $added constraints"
 
     @info "Ready to solve!"
     # p = Params(ctx)
