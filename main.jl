@@ -16,7 +16,7 @@ import Z3
 chosen = []
 for (nv, c) in nv_to_const
     if is_true(Z3.eval(model, c))
-        println(nv)
+        # println(nv)
         push!(chosen, nv)
     end
 end

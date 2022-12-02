@@ -1,6 +1,8 @@
 
+using Combinatorics: combinations
+using ProgressMeter
 using Z3
-using Z3: ExprAllocated
+using Z3: ExprAllocated, OptimizeAllocated
 
 
 function show_version_number(vn::VersionNumber)::String
@@ -9,7 +11,48 @@ function show_version_number(vn::VersionNumber)::String
     return String(take!(io))
 end
 
-function run_solver(bounds, versions, latest_versions)
+function add_nway_resolvability_constraints(versions::VersionsDict, nv_to_const, s::OptimizeAllocated, nvs::Vector{NameAndVersion}, n::Int64)
+    subsets_iterator = combinations(nvs, n)
+
+    p = Progress(binomial(length(nvs), n), 1)
+    counter = 0
+
+    for subset in subsets_iterator
+        # Build up the full set of bounds
+        relevant_bounds = Dict{String, Constraints}()
+        for nv in subset
+            relevant_bounds = merge(vcat, relevant_bounds, bounds[nv])
+        end
+
+        constraints_to_add = []
+        resolution_failure = false
+        for (dep_name, specs) in relevant_bounds
+            if dep_name == "julia"; continue; end
+            if !haskey(versions, dep_name); continue; end
+
+            compatible_versions = filter(v -> all(spec -> in(v, spec), specs), versions[dep_name])
+            if length(compatible_versions) == 0
+                # Guess this subset isn't resolvable at all
+                # @warn "$subset: Couldn't find a compatible version for $dep_name with specs $specs (available: $(versions[dep_name]))"
+                resolution_failure = true
+                break
+            else
+                push!(constraints_to_add, reduce(or, [nv_to_const[NameAndVersion(dep_name, v)] for v in compatible_versions]))
+            end
+        end
+
+        if !resolution_failure
+            for c in constraints_to_add
+                add(s, c)
+            end
+        end
+
+        counter += 1
+        update!(p, counter)
+    end
+end
+
+function run_solver(bounds::BoundsDict, versions::VersionsDict, latest_versions::Vector{NameAndVersion})
     ctx = Context()
 
     nv_to_const = Dict{NameAndVersion, ExprAllocated}()
@@ -25,22 +68,13 @@ function run_solver(bounds, versions, latest_versions)
     end
 
     # Every package we just added must be 1-resolvable
-    for nv in latest_versions
-        relevant_bounds = bounds[nv]
-        for (dep_name, specs) in relevant_bounds
-            if dep_name == "julia"; continue; end
-            if !haskey(versions, dep_name); continue; end
+    @info "Adding 1-way resolvability constraints ($(binomial(length(latest_versions), 1)))"
+    add_nway_resolvability_constraints(versions, nv_to_const, s, latest_versions, 1)
 
-            compatible_versions = filter(v -> all(spec -> in(v, spec), specs), versions[dep_name])
-            if length(compatible_versions) == 0
-                # Guess nv isn't resolvable at all
-                @warn "$nv: Couldn't find a compatible version for $dep_name with specs $specs (available: $(versions[dep_name]))"
-            else
-                add(s, reduce(or, [nv_to_const[NameAndVersion(dep_name, v)] for v in compatible_versions]))
-            end
-        end
-    end
+    @info "Adding 2-way resolvability constraints ($(binomial(length(latest_versions), 2)))"
+    add_nway_resolvability_constraints(versions, nv_to_const, s, latest_versions, 2)
 
+    @info "Ready to solve!"
     # p = Params(ctx)
     # set(p, "priority", "pareto")
     # set(s, p)
