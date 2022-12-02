@@ -59,6 +59,8 @@ function add_nway_resolvability_constraints(versions::VersionsDict, nv_to_const,
         update!(p, counter)
     end
 
+    finish!(p)
+
     return num_added
 end
 
